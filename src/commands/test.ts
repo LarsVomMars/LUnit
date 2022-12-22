@@ -70,7 +70,11 @@ const parseTestFile = (testData: string, name: string): TestFileData => {
         } else {
             if (data.interactions.length === 0) {
                 data.interactions.push({ output: line + "\n" });
-            } else data.interactions.at(-1)!.output += line + "\n";
+            } else {
+                if (data.interactions.at(-1)!.output)
+                    data.interactions.at(-1)!.output += line + "\n";
+                else data.interactions.at(-1)!.output = line + "\n";
+            }
         }
     }
 
@@ -105,7 +109,7 @@ export const handler = async (args: ArgumentsCamelCase<HandlerArgs>) => {
     let execClass;
 
     try {
-        execClass = await findFile(execPath, entry);
+        execClass = await findFile(execPath, entry + ".class");
         if (!execClass) {
             console.log("No entry class found!");
             process.exit(2);
@@ -124,19 +128,55 @@ export const handler = async (args: ArgumentsCamelCase<HandlerArgs>) => {
         // TODO: Autodetect format
         // TODO: Convert test file to other format
     }
+
+    // TODO: Clean up
+    const clazz = execClass
+        .replace(execPath, "")
+        .replace(/\\/g, "/")
+        .replace(".class", "")
+        .substring(1);
+
     const data = parseTestFile(testFile, test);
-    const proc = spawn("java", [execClass, ...data.args], { cwd: execPath });
+    const proc = spawn("java", [clazz, ...data.args], { cwd: execPath });
 
-    let interaction: TestInteraction = {};
+    const output = () =>
+        new Promise((resolve) =>
+            proc.stdout.on("data", (data) => resolve(data.toString()))
+        );
+    const error = () =>
+        new Promise((resolve) =>
+            proc.stderr.on("data", (data) => resolve(data.toString()))
+        );
+    proc.on("error", (e) => console.error(e.toString()));
+    // TODO: Check against instruction.exit
+    proc.on("close", (code) => console.log("Exited with code: " + code));
 
-    proc.stdout.on("data", (_data) => {});
-    proc.stderr.on("data", (_data) => {});
-    proc.on("close", (_code) => {});
-
-    for (let i = 0; i < data.interactions.length; i++) {
-        interaction = data.interactions[i];
+    for (const interaction of data.interactions) {
+        console.log(interaction);
         if (interaction.input) {
             proc.stdin.write(interaction.input);
+        }
+        if (interaction.output) {
+            // TODO: Fix multiple expected outputs that are interpreted as one interaction but multiple outputs
+            const result = await output();
+            if (result !== interaction.output) {
+                console.log("Output mismatch!");
+                console.log("Expected:");
+                console.log(interaction.output);
+                console.log("Got:");
+                console.log(result);
+                process.exit(4);
+            }
+        } else if (interaction.error) {
+            const result = await error();
+            if (result !== interaction.output) {
+                console.log("Error mismatch!");
+                console.log("Expected:");
+                console.log(interaction.output);
+                console.log("Got:");
+                console.log(result);
+                process.exit(4);
+            }
         }
     }
 };
