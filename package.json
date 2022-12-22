@@ -1,0 +1,21 @@
+{
+    "name": "LUnit",
+    "version": "1.0.0",
+    "main": "index.js",
+    "repository": "git@github.com:LarsVomMars/LUnit.git",
+    "author": "LarsVomMars <developer@kroenner.eu>",
+    "license": "MIT",
+    "devDependencies": {
+        "@types/node": "^18.11.17",
+        "@types/yargs": "^17.0.17",
+        "typescript": "^5.0.0-dev.20221220"
+    },
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc -w",
+        "run": "node ./dist/lunit.js"
+    },
+    "dependencies": {
+        "yargs": "^17.1.1-candidate.0"
+    }
+}
